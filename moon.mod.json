@@ -1,9 +1,14 @@
 {
-  "name": "username/hello",
+  "name": "jedisct1/aegis",
   "version": "0.1.0",
   "readme": "README.md",
-  "repository": "",
-  "license": "Apache-2.0",
-  "keywords": [],
-  "description": ""
+  "repository": "https://github.com/jedisct1/moonbit-aegis",
+  "license": "MIT",
+  "keywords": [
+    "crypto",
+    "aead",
+    "aegis",
+    "encryption"
+  ],
+  "description": "AEGIS cipher implementation in Moonbit"
 }

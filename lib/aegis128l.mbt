@@ -391,7 +391,3 @@ fn bytes_array_to_bytes(bytes_array : Array[Int]) -> Bytes {
   @array.iteri(bytes_array, fn(i, x) -> Unit { bytes[i] = x })
   bytes
 }
-
-fn init {
-
-}

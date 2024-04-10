@@ -253,11 +253,6 @@ fn mac(self : Aegis128L, ad_len_bytes : Int, msg_len_bytes : Int) -> Bytes {
   tag
 }
 
-pub struct AuthenticatedCiphertext {
-  ciphertext : Bytes
-  tag : Bytes
-}
-
 pub fn encrypt_detached(
   self : Aegis128L,
   msg : Option[Bytes],
@@ -384,10 +379,4 @@ pub fn decrypt_detached(
     return Err("Verification failed")
   }
   return Ok(msg)
-}
-
-fn bytes_array_to_bytes(bytes_array : Array[Int]) -> Bytes {
-  let bytes = Bytes::make(bytes_array.length(), 0)
-  @array.iteri(bytes_array, fn(i, x) -> Unit { bytes[i] = x })
-  bytes
 }

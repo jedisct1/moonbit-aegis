@@ -277,7 +277,7 @@ pub fn encrypt_detached(
         pad[j] = 0
       }
       for j = 0; j < ad.length() % 32; j = j + 1 {
-        pad[i] = ad[i + j]
+        pad[j] = ad[i + j]
       }
       self.absorb(pad)
     }
@@ -341,7 +341,7 @@ pub fn decrypt_detached(
         pad[j] = 0
       }
       for j = 0; j < ad.length() % 32; j = j + 1 {
-        pad[i] = ad[i + j]
+        pad[j] = ad[i + j]
       }
       self.absorb(pad)
     }

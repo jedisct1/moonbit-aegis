@@ -1,8 +1,8 @@
 test "Aegis-256 MAC" {
-  let key = Bytes::make(32, 1)
-  let nonce = Bytes::make(32, 2)
+  let key = Bytes::make(32, init=(1).to_byte())
+  let nonce = Bytes::make(32, init=(2).to_byte())
   let tag_length = 32
-  let ad = Bytes::make(20, 4)
+  let ad = Bytes::make(20, init=(4).to_byte())
   let aegis = Aegis256::new(key, nonce, tag_length)?
   let ac = aegis.encrypt_detached(None, Some(ad))
   //
@@ -15,12 +15,12 @@ test "Aegis-256 MAC" {
 }
 
 test "Aegis-256 roundtrip" {
-  let key = Bytes::make(32, 1)
-  let nonce = Bytes::make(32, 2)
+  let key = Bytes::make(32, init=(1).to_byte())
+  let nonce = Bytes::make(32, init=(2).to_byte())
   let tag_length = 32
-  let msg = Bytes::make(50, 0)
+  let msg = Bytes::make(50)
   for i = 0; i < msg.length(); i = i + 1 {
-    msg[i] = i
+    msg[i] = i.to_byte()
   }
   let aegis = Aegis256::new(key, nonce, tag_length)?
   let authenticated_ciphertext = aegis.encrypt_detached(Some(msg), None)
@@ -33,14 +33,14 @@ test "Aegis-256 roundtrip" {
 }
 
 test "Aegis-256 roundtrip with associated data" {
-  let key = Bytes::make(32, 1)
-  let nonce = Bytes::make(32, 2)
+  let key = Bytes::make(32, init=(1).to_byte())
+  let nonce = Bytes::make(32, init=(2).to_byte())
   let tag_length = 32
-  let msg = Bytes::make(50, 0)
+  let msg = Bytes::make(50)
   for i = 0; i < msg.length(); i = i + 1 {
-    msg[i] = i
+    msg[i] = i.to_byte()
   }
-  let ad = Bytes::make(20, 4)
+  let ad = Bytes::make(20, init=(4).to_byte())
   let aegis = Aegis256::new(key, nonce, tag_length)?
   let authenticated_ciphertext = aegis.encrypt_detached(Some(msg), Some(ad))
   //

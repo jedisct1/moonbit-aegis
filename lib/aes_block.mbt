@@ -168,50 +168,50 @@ pub struct AesBlock {
 pub fn AesBlock::from_bytes(bytes : Bytes) -> AesBlock {
   @assertion.assert_eq(bytes.length(), 16).unwrap()
   //
-  let a = bytes[0 * 4 + 0].land(0xff).lsl(0)
-  let a = a.lor(bytes[0 * 4 + 1].land(0xff).lsl(8))
-  let a = a.lor(bytes[0 * 4 + 2].land(0xff).lsl(16))
-  let a = a.lor(bytes[0 * 4 + 3].land(0xff).lsl(24))
+  let a = bytes[0 * 4 + 0].to_int().land(0xff).lsl(0)
+  let a = a.lor(bytes[0 * 4 + 1].to_int().land(0xff).lsl(8))
+  let a = a.lor(bytes[0 * 4 + 2].to_int().land(0xff).lsl(16))
+  let a = a.lor(bytes[0 * 4 + 3].to_int().land(0xff).lsl(24))
   //
-  let b = bytes[1 * 4 + 0].land(0xff).lsl(0)
-  let b = b.lor(bytes[1 * 4 + 1].land(0xff).lsl(8))
-  let b = b.lor(bytes[1 * 4 + 2].land(0xff).lsl(16))
-  let b = b.lor(bytes[1 * 4 + 3].land(0xff).lsl(24))
+  let b = bytes[1 * 4 + 0].to_int().land(0xff).lsl(0)
+  let b = b.lor(bytes[1 * 4 + 1].to_int().land(0xff).lsl(8))
+  let b = b.lor(bytes[1 * 4 + 2].to_int().land(0xff).lsl(16))
+  let b = b.lor(bytes[1 * 4 + 3].to_int().land(0xff).lsl(24))
   //
-  let c = bytes[2 * 4 + 0].land(0xff).lsl(0)
-  let c = c.lor(bytes[2 * 4 + 1].land(0xff).lsl(8))
-  let c = c.lor(bytes[2 * 4 + 2].land(0xff).lsl(16))
-  let c = c.lor(bytes[2 * 4 + 3].land(0xff).lsl(24))
+  let c = bytes[2 * 4 + 0].to_int().land(0xff).lsl(0)
+  let c = c.lor(bytes[2 * 4 + 1].to_int().land(0xff).lsl(8))
+  let c = c.lor(bytes[2 * 4 + 2].to_int().land(0xff).lsl(16))
+  let c = c.lor(bytes[2 * 4 + 3].to_int().land(0xff).lsl(24))
   //
-  let d = bytes[3 * 4 + 0].land(0xff).lsl(0)
-  let d = d.lor(bytes[3 * 4 + 1].land(0xff).lsl(8))
-  let d = d.lor(bytes[3 * 4 + 2].land(0xff).lsl(16))
-  let d = d.lor(bytes[3 * 4 + 3].land(0xff).lsl(24))
+  let d = bytes[3 * 4 + 0].to_int().land(0xff).lsl(0)
+  let d = d.lor(bytes[3 * 4 + 1].to_int().land(0xff).lsl(8))
+  let d = d.lor(bytes[3 * 4 + 2].to_int().land(0xff).lsl(16))
+  let d = d.lor(bytes[3 * 4 + 3].to_int().land(0xff).lsl(24))
   //
   { a, b, c, d }
 }
 
 pub fn to_bytes(self : AesBlock) -> Bytes {
-  let bytes = Bytes::make(16, 0)
-  bytes[0 * 4 + 0] = self.a.lsr(0)
-  bytes[0 * 4 + 1] = self.a.lsr(8)
-  bytes[0 * 4 + 2] = self.a.lsr(16)
-  bytes[0 * 4 + 3] = self.a.lsr(24)
+  let bytes = Bytes::make(16)
+  bytes[0 * 4 + 0] = self.a.lsr(0).to_byte()
+  bytes[0 * 4 + 1] = self.a.lsr(8).to_byte()
+  bytes[0 * 4 + 2] = self.a.lsr(16).to_byte()
+  bytes[0 * 4 + 3] = self.a.lsr(24).to_byte()
   //
-  bytes[1 * 4 + 0] = self.b.lsr(0)
-  bytes[1 * 4 + 1] = self.b.lsr(8)
-  bytes[1 * 4 + 2] = self.b.lsr(16)
-  bytes[1 * 4 + 3] = self.b.lsr(24)
+  bytes[1 * 4 + 0] = self.b.lsr(0).to_byte()
+  bytes[1 * 4 + 1] = self.b.lsr(8).to_byte()
+  bytes[1 * 4 + 2] = self.b.lsr(16).to_byte()
+  bytes[1 * 4 + 3] = self.b.lsr(24).to_byte()
   //
-  bytes[2 * 4 + 0] = self.c.lsr(0)
-  bytes[2 * 4 + 1] = self.c.lsr(8)
-  bytes[2 * 4 + 2] = self.c.lsr(16)
-  bytes[2 * 4 + 3] = self.c.lsr(24)
+  bytes[2 * 4 + 0] = self.c.lsr(0).to_byte()
+  bytes[2 * 4 + 1] = self.c.lsr(8).to_byte()
+  bytes[2 * 4 + 2] = self.c.lsr(16).to_byte()
+  bytes[2 * 4 + 3] = self.c.lsr(24).to_byte()
   //
-  bytes[3 * 4 + 0] = self.d.lsr(0)
-  bytes[3 * 4 + 1] = self.d.lsr(8)
-  bytes[3 * 4 + 2] = self.d.lsr(16)
-  bytes[3 * 4 + 3] = self.d.lsr(24)
+  bytes[3 * 4 + 0] = self.d.lsr(0).to_byte()
+  bytes[3 * 4 + 1] = self.d.lsr(8).to_byte()
+  bytes[3 * 4 + 2] = self.d.lsr(16).to_byte()
+  bytes[3 * 4 + 3] = self.d.lsr(24).to_byte()
   //
   bytes
 }

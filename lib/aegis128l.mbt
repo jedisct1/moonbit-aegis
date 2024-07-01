@@ -2,7 +2,7 @@ pub struct Aegis128L {
   mut state : Array[AesBlock]
   mut tag_length : Int
   mut finalized : Bool
-} derive(Debug, Show, Default)
+} derive(Debug, Show)
 
 pub fn Aegis128L::new(
   key : Bytes,
@@ -93,8 +93,8 @@ fn update(self : Aegis128L, m0 : AesBlock, m1 : AesBlock) -> Unit {
 }
 
 fn absorb(self : Aegis128L, ai : Bytes) -> Unit {
-  let ai0 = Bytes::make(16, 0)
-  let ai1 = Bytes::make(16, 0)
+  let ai0 = Bytes::make(16)
+  let ai1 = Bytes::make(16)
   for i = 0; i < 16; i = i + 1 {
     ai0[i] = ai[i]
   }
@@ -110,8 +110,8 @@ fn enc(self : Aegis128L, xi : Bytes) -> Bytes {
   let s = self.state
   let z0 = s[6].xor(s[1]).xor(s[2].and(s[3]))
   let z1 = s[2].xor(s[5]).xor(s[6].and(s[7]))
-  let xi0 = Bytes::make(16, 0)
-  let xi1 = Bytes::make(16, 0)
+  let xi0 = Bytes::make(16)
+  let xi1 = Bytes::make(16)
   //
   for i = 0; i < 16; i = i + 1 {
     xi0[i] = xi[i]
@@ -124,7 +124,7 @@ fn enc(self : Aegis128L, xi : Bytes) -> Bytes {
   let out0_bytes = t0.xor(z0).to_bytes()
   let out1_bytes = t1.xor(z1).to_bytes()
   self.update(t0, t1)
-  let ci = Bytes::make(32, 0)
+  let ci = Bytes::make(32)
   for i = 0; i < 16; i = i + 1 {
     ci[i] = out0_bytes[i]
   }
@@ -138,8 +138,8 @@ fn dec(self : Aegis128L, ci : Bytes) -> Bytes {
   let s = self.state
   let z0 = s[6].xor(s[1]).xor(s[2].and(s[3]))
   let z1 = s[2].xor(s[5]).xor(s[6].and(s[7]))
-  let ci0 = Bytes::make(16, 0)
-  let ci1 = Bytes::make(16, 0)
+  let ci0 = Bytes::make(16)
+  let ci1 = Bytes::make(16)
   for i = 0; i < 16; i = i + 1 {
     ci0[i] = ci[i]
   }
@@ -153,7 +153,7 @@ fn dec(self : Aegis128L, ci : Bytes) -> Bytes {
   self.update(out0, out1)
   let out0_bytes = out0.to_bytes()
   let out1_bytes = out1.to_bytes()
-  let xi = Bytes::make(32, 0)
+  let xi = Bytes::make(32)
   for i = 0; i < 16; i = i + 1 {
     xi[i] = out0_bytes[i]
   }
@@ -167,8 +167,8 @@ fn dec_last(self : Aegis128L, cn : Bytes) -> Bytes {
   let s = self.state
   let z0 = s[6].xor(s[1]).xor(s[2].and(s[3]))
   let z1 = s[2].xor(s[5]).xor(s[6].and(s[7]))
-  let pad0 = Bytes::make(16, 0)
-  let pad1 = Bytes::make(16, 0)
+  let pad0 = Bytes::make(16)
+  let pad1 = Bytes::make(16)
   let cn_length = cn.length()
   let n = if cn_length >= 16 { 16 } else { cn_length }
   for i = 0; i < n; i = i + 1 {
@@ -187,7 +187,7 @@ fn dec_last(self : Aegis128L, cn : Bytes) -> Bytes {
   for i = 0; i < 16; i = i + 1 {
     pad1[i] = out1_bytes[i]
   }
-  let xn = Bytes::make(cn_length, 0)
+  let xn = Bytes::make(cn_length)
   for i = 0; i < n; i = i + 1 {
     xn[i] = pad0[i]
   }
@@ -195,11 +195,11 @@ fn dec_last(self : Aegis128L, cn : Bytes) -> Bytes {
     xn[i] = pad1[i - 16]
   }
   for i = cn_length; i < 16; i = i + 1 {
-    pad0[i] = 0
+    pad0[i] = b'\x00'
   }
   if cn_length > 16 {
     for i = cn_length - 16; i < 16; i = i + 1 {
-      pad1[i] = 0
+      pad1[i] = b'\x00'
     }
   }
   let v0 = AesBlock::from_bytes(pad0)
@@ -212,27 +212,27 @@ fn mac(self : Aegis128L, ad_len_bytes : Int, msg_len_bytes : Int) -> Bytes {
   self.finalized = true
   //
   let s = self.state
-  let bytes = Bytes::make(16, 0)
+  let bytes = Bytes::make(16)
   //
   let ad_len = @int64.from_int(ad_len_bytes) * 8L
   let msg_len = @int64.from_int(msg_len_bytes) * 8L
   //
-  bytes[0 * 8 + 0] = ad_len.lsr(0).to_int()
-  bytes[0 * 8 + 1] = ad_len.lsr(8).to_int()
-  bytes[0 * 8 + 2] = ad_len.lsr(16).to_int()
-  bytes[0 * 8 + 3] = ad_len.lsr(24).to_int()
-  bytes[0 * 8 + 4] = ad_len.lsr(32).to_int()
-  bytes[0 * 8 + 5] = ad_len.lsr(40).to_int()
-  bytes[0 * 8 + 6] = ad_len.lsr(48).to_int()
-  bytes[0 * 8 + 7] = ad_len.lsr(56).to_int()
-  bytes[1 * 8 + 0] = msg_len.lsr(0).to_int()
-  bytes[1 * 8 + 1] = msg_len.lsr(8).to_int()
-  bytes[1 * 8 + 2] = msg_len.lsr(16).to_int()
-  bytes[1 * 8 + 3] = msg_len.lsr(24).to_int()
-  bytes[1 * 8 + 4] = msg_len.lsr(32).to_int()
-  bytes[1 * 8 + 5] = msg_len.lsr(40).to_int()
-  bytes[1 * 8 + 6] = msg_len.lsr(48).to_int()
-  bytes[1 * 8 + 7] = msg_len.lsr(56).to_int()
+  bytes[0 * 8 + 0] = ad_len.lsr(0).to_byte()
+  bytes[0 * 8 + 1] = ad_len.lsr(8).to_byte()
+  bytes[0 * 8 + 2] = ad_len.lsr(16).to_byte()
+  bytes[0 * 8 + 3] = ad_len.lsr(24).to_byte()
+  bytes[0 * 8 + 4] = ad_len.lsr(32).to_byte()
+  bytes[0 * 8 + 5] = ad_len.lsr(40).to_byte()
+  bytes[0 * 8 + 6] = ad_len.lsr(48).to_byte()
+  bytes[0 * 8 + 7] = ad_len.lsr(56).to_byte()
+  bytes[1 * 8 + 0] = msg_len.lsr(0).to_byte()
+  bytes[1 * 8 + 1] = msg_len.lsr(8).to_byte()
+  bytes[1 * 8 + 2] = msg_len.lsr(16).to_byte()
+  bytes[1 * 8 + 3] = msg_len.lsr(24).to_byte()
+  bytes[1 * 8 + 4] = msg_len.lsr(32).to_byte()
+  bytes[1 * 8 + 5] = msg_len.lsr(40).to_byte()
+  bytes[1 * 8 + 6] = msg_len.lsr(48).to_byte()
+  bytes[1 * 8 + 7] = msg_len.lsr(56).to_byte()
   //
   let t = s[2].xor(AesBlock::from_bytes(bytes))
   for i = 0; i < 7; i = i + 1 {
@@ -241,7 +241,7 @@ fn mac(self : Aegis128L, ad_len_bytes : Int, msg_len_bytes : Int) -> Bytes {
   if self.tag_length == 16 {
     return s[0].xor(s[1]).xor(s[2]).xor(s[3]).xor(s[4]).xor(s[5]).xor(s[6]).to_bytes()
   }
-  let tag = Bytes::make(32, 0)
+  let tag = Bytes::make(32)
   let t0 = s[0].xor(s[1]).xor(s[2]).xor(s[3]).to_bytes()
   let t1 = s[4].xor(s[5]).xor(s[6]).xor(s[7]).to_bytes()
   for i = 0; i < 16; i = i + 1 {
@@ -255,12 +255,12 @@ fn mac(self : Aegis128L, ad_len_bytes : Int, msg_len_bytes : Int) -> Bytes {
 
 pub fn encrypt_detached(
   self : Aegis128L,
-  msg : Option[Bytes],
-  ad : Option[Bytes]
+  msg : Bytes?,
+  ad : Bytes?
 ) -> AuthenticatedCiphertext {
   @assertion.assert_true(self.finalized.not()).unwrap()
   //  
-  let buf32 = Bytes::make(32, 0)
+  let buf32 = Bytes::make(32)
   let mut i = 0
   if ad.is_empty().not() {
     let ad = ad.unwrap()
@@ -274,7 +274,7 @@ pub fn encrypt_detached(
     if ad.length() % 32 != 0 {
       let pad = buf32
       for j = 0; j < pad.length(); j = j + 1 {
-        pad[j] = 0
+        pad[j] = b'\x00'
       }
       for j = 0; j < ad.length() % 32; j = j + 1 {
         pad[j] = ad[i + j]
@@ -283,7 +283,7 @@ pub fn encrypt_detached(
     }
   }
   let ciphertext_length = if msg.is_empty() { 0 } else { msg.unwrap().length() }
-  let ciphertext = Bytes::make(ciphertext_length, 0)
+  let ciphertext = Bytes::make(ciphertext_length)
   if msg.is_empty().not() {
     let msg = msg.unwrap()
     let mut i = 0
@@ -300,7 +300,7 @@ pub fn encrypt_detached(
     if msg.length() % 32 != 0 {
       let pad = buf32
       for j = 0; j < pad.length(); j = j + 1 {
-        pad[j] = 0
+        pad[j] = b'\x00'
       }
       for j = 0; j < msg.length() % 32; j = j + 1 {
         pad[j] = msg[i + j]
@@ -320,11 +320,11 @@ pub fn encrypt_detached(
 pub fn decrypt_detached(
   self : Aegis128L,
   ac : AuthenticatedCiphertext,
-  ad : Option[Bytes]
+  ad : Bytes?
 ) -> Result[Bytes, String] {
   @assertion.assert_true(self.finalized.not()).unwrap()
   //  
-  let buf32 = Bytes::make(32, 0)
+  let buf32 = Bytes::make(32)
   let mut i = 0
   if ad.is_empty().not() {
     let ad = ad.unwrap()
@@ -338,7 +338,7 @@ pub fn decrypt_detached(
     if ad.length() % 32 != 0 {
       let pad = buf32
       for j = 0; j < pad.length(); j = j + 1 {
-        pad[j] = 0
+        pad[j] = b'\x00'
       }
       for j = 0; j < ad.length() % 32; j = j + 1 {
         pad[j] = ad[i + j]
@@ -347,7 +347,7 @@ pub fn decrypt_detached(
     }
   }
   let msg_length = ac.ciphertext.length()
-  let msg = Bytes::make(msg_length, 0)
+  let msg = Bytes::make(msg_length)
   let mut i = 0
   while i + 32 <= ac.ciphertext.length() {
     for j = 0; j < 32; j = j + 1 {
@@ -360,7 +360,7 @@ pub fn decrypt_detached(
     i = i + 32
   }
   if ac.ciphertext.length() % 32 != 0 {
-    let remaining = Bytes::make(ac.ciphertext.length() % 32, 0)
+    let remaining = Bytes::make(ac.ciphertext.length() % 32)
     for j = 0; j < remaining.length(); j = j + 1 {
       remaining[j] = ac.ciphertext[i + j]
     }
@@ -371,11 +371,11 @@ pub fn decrypt_detached(
   }
   let ad_length = if ad.is_empty() { 0 } else { ad.unwrap().length() }
   let tag = self.mac(ad_length, msg_length)
-  let mut dt = 0
+  let mut dt = b'\x00'
   for i = 0; i < tag.length(); i = i + 1 {
-    dt = dt.lor(tag[i].lxor(ac.tag[i]))
+    dt = dt.to_int().lor(tag[i].to_int().lxor(ac.tag[i].to_int())).to_byte()
   }
-  if dt != 0 {
+  if dt != b'\x00' {
     return Err("Verification failed")
   }
   return Ok(msg)

@@ -163,10 +163,10 @@ pub struct AesBlock {
   b : Int
   c : Int
   d : Int
-} derive(Debug, Show, Default)
+} derive(Show, Default)
 
 pub fn AesBlock::from_bytes(bytes : Bytes) -> AesBlock {
-  @assertion.assert_eq(bytes.length(), 16).unwrap()
+  assert_eq?(bytes.length(), 16).unwrap()
   //
   let a = bytes[0 * 4 + 0].to_int().land(0xff).lsl(0)
   let a = a.lor(bytes[0 * 4 + 1].to_int().land(0xff).lsl(8))
@@ -192,7 +192,7 @@ pub fn AesBlock::from_bytes(bytes : Bytes) -> AesBlock {
 }
 
 pub fn to_bytes(self : AesBlock) -> Bytes {
-  let bytes = Bytes::make(16)
+  let bytes = Bytes::new(16)
   bytes[0 * 4 + 0] = self.a.lsr(0).to_byte()
   bytes[0 * 4 + 1] = self.a.lsr(8).to_byte()
   bytes[0 * 4 + 2] = self.a.lsr(16).to_byte()

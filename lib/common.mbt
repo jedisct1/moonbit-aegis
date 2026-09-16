@@ -18,29 +18,35 @@ fn tags_equal(a : Bytes, b : Bytes) -> Bool {
 }
 
 ///|
-/// Encodes `len(ad) * 8` and `len(msg) * 8` as two little-endian 64-bit
-/// integers, as required by the finalization step.
-fn encode_lengths(ad_len_bytes : Int, msg_len_bytes : Int) -> FixedArray[Byte] {
-  let bytes = FixedArray::make(16, b'\x00')
+/// The block `LE64(ad_len_bits) || LE64(msg_len_bits)` absorbed during
+/// finalization.
+fn length_block(ad_len_bytes : Int, msg_len_bytes : Int) -> AesBlock {
   let ad_len = ad_len_bytes.to_int64() * 8L
   let msg_len = msg_len_bytes.to_int64() * 8L
-  for i = 0; i < 8; i = i + 1 {
-    bytes[0 * 8 + i] = (ad_len >> (8 * i)).to_byte()
-    bytes[1 * 8 + i] = (msg_len >> (8 * i)).to_byte()
+  {
+    a: ad_len.to_int(),
+    b: (ad_len >> 32).to_int(),
+    c: msg_len.to_int(),
+    d: (msg_len >> 32).to_int(),
   }
-  bytes
 }
 
 ///|
-/// AEGIS constant C0 (Fibonacci sequence modulo 256).
-let c0_bytes : FixedArray[Byte] = [
-  b'\x00', b'\x01', b'\x01', b'\x02', b'\x03', b'\x05', b'\x08', b'\x0d', b'\x15',
-  b'\x22', b'\x37', b'\x59', b'\x90', b'\xe9', b'\x79', b'\x62',
-]
+/// AEGIS constant C0 (00 01 01 02 03 05 08 0d 15 22 37 59 90 e9 79 62),
+/// loaded as little-endian words.
+let c0 : AesBlock = {
+  a: 0x02010100,
+  b: 0x0d080503,
+  c: 0x59372215,
+  d: 0x6279e990,
+}
 
 ///|
-/// AEGIS constant C1.
-let c1_bytes : FixedArray[Byte] = [
-  b'\xdb', b'\x3d', b'\x18', b'\x55', b'\x6d', b'\xc2', b'\x2f', b'\xf1', b'\x20',
-  b'\x11', b'\x31', b'\x42', b'\x73', b'\xb5', b'\x28', b'\xdd',
-]
+/// AEGIS constant C1 (db 3d 18 55 6d c2 2f f1 20 11 31 42 73 b5 28 dd),
+/// loaded as little-endian words.
+let c1 : AesBlock = {
+  a: 0x55183ddb,
+  b: 0xf12fc26d,
+  c: 0x42311120,
+  d: 0xdd28b573,
+}

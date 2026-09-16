@@ -1,18 +1,8 @@
 ///|
 fn hex(s : String) -> Bytes {
-  let n = s.length() / 2
-  Bytes::makei(n, i => {
-    let nibble = (c : Int) => {
-      if c >= 'a'.to_int() {
-        c - 'a'.to_int() + 10
-      } else {
-        c - '0'.to_int()
-      }
-    }
-    let hi = nibble(s.code_unit_at(2 * i).to_int())
-    let lo = nibble(s.code_unit_at(2 * i + 1).to_int())
-    ((hi << 4) | lo).to_byte()
-  })
+  @hex.decode(s) catch {
+    _ => abort("invalid hex test vector")
+  }
 }
 
 ///|

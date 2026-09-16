@@ -163,6 +163,7 @@ let lut3 : FixedArray[Int] = [
 ]
 
 ///|
+#valtype
 pub(all) struct AesBlock {
   a : Int
   b : Int
@@ -190,10 +191,30 @@ fn store_le32(bytes : FixedArray[Byte], offset : Int, x : Int) -> Unit {
 /// Loads a block from `bytes[offset:offset + 16]`.
 fn AesBlock::load(bytes : FixedArray[Byte], offset : Int) -> AesBlock {
   {
-    a: load_le32(bytes, offset + 0 * 4),
-    b: load_le32(bytes, offset + 1 * 4),
-    c: load_le32(bytes, offset + 2 * 4),
-    d: load_le32(bytes, offset + 3 * 4),
+    a: load_le32(bytes, offset),
+    b: load_le32(bytes, offset + 4),
+    c: load_le32(bytes, offset + 8),
+    d: load_le32(bytes, offset + 12),
+  }
+}
+
+///|
+/// Loads a block from `bytes[offset:offset + 16]`.
+fn AesBlock::load_bytes(bytes : Bytes, offset : Int) -> AesBlock {
+  AesBlock::from_view(bytes[offset:offset + 16])
+}
+
+///|
+fn AesBlock::from_view(bytes : BytesView) -> AesBlock {
+  match bytes {
+    [u32le(a), u32le(b), u32le(c), u32le(d)] =>
+      {
+        a: a.reinterpret_as_int(),
+        b: b.reinterpret_as_int(),
+        c: c.reinterpret_as_int(),
+        d: d.reinterpret_as_int(),
+      }
+    _ => abort("AesBlock::from_bytes: expected 16 bytes")
   }
 }
 
@@ -204,38 +225,15 @@ fn AesBlock::store(
   bytes : FixedArray[Byte],
   offset : Int,
 ) -> Unit {
-  store_le32(bytes, offset + 0 * 4, self.a)
-  store_le32(bytes, offset + 1 * 4, self.b)
-  store_le32(bytes, offset + 2 * 4, self.c)
-  store_le32(bytes, offset + 3 * 4, self.d)
+  store_le32(bytes, offset, self.a)
+  store_le32(bytes, offset + 4, self.b)
+  store_le32(bytes, offset + 8, self.c)
+  store_le32(bytes, offset + 12, self.d)
 }
 
 ///|
 pub fn AesBlock::from_bytes(bytes : Bytes) -> AesBlock {
-  guard bytes.length() == 16 else {
-    abort("AesBlock::from_bytes: expected 16 bytes")
-  }
-  let a = bytes[0 * 4 + 0].to_int()
-  let a = a | (bytes[0 * 4 + 1].to_int() << 8)
-  let a = a | (bytes[0 * 4 + 2].to_int() << 16)
-  let a = a | (bytes[0 * 4 + 3].to_int() << 24)
-  //
-  let b = bytes[1 * 4 + 0].to_int()
-  let b = b | (bytes[1 * 4 + 1].to_int() << 8)
-  let b = b | (bytes[1 * 4 + 2].to_int() << 16)
-  let b = b | (bytes[1 * 4 + 3].to_int() << 24)
-  //
-  let c = bytes[2 * 4 + 0].to_int()
-  let c = c | (bytes[2 * 4 + 1].to_int() << 8)
-  let c = c | (bytes[2 * 4 + 2].to_int() << 16)
-  let c = c | (bytes[2 * 4 + 3].to_int() << 24)
-  //
-  let d = bytes[3 * 4 + 0].to_int()
-  let d = d | (bytes[3 * 4 + 1].to_int() << 8)
-  let d = d | (bytes[3 * 4 + 2].to_int() << 16)
-  let d = d | (bytes[3 * 4 + 3].to_int() << 24)
-  //
-  { a, b, c, d, }
+  AesBlock::from_view(bytes[:])
 }
 
 ///|
@@ -270,16 +268,6 @@ pub fn AesBlock::land(self : AesBlock, other : AesBlock) -> AesBlock {
     c: self.c & other.c,
     d: self.d & other.d,
   }
-}
-
-///|
-pub impl BitXOr for AesBlock with fn lxor(self, other) {
-  self.xor(other)
-}
-
-///|
-pub impl BitAnd for AesBlock with fn land(self, other) {
-  AesBlock::land(self, other)
 }
 
 ///|

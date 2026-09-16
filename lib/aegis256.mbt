@@ -15,28 +15,14 @@ pub fn Aegis256::new(
   assert_true(nonce.length() == 32)
   assert_true(tag_length == 16 || tag_length == 32)
   //
-  let key_bytes = FixedArray::make(32, b'\x00')
-  key_bytes.blit_from_bytes(0, key, 0, 32)
-  let nonce_bytes = FixedArray::make(32, b'\x00')
-  nonce_bytes.blit_from_bytes(0, nonce, 0, 32)
-  //
-  let c0 = AesBlock::load(c0_bytes, 0)
-  let c1 = AesBlock::load(c1_bytes, 0)
-  //
-  let k0 = AesBlock::load(key_bytes, 0)
-  let k1 = AesBlock::load(key_bytes, 16)
-  let n0 = AesBlock::load(nonce_bytes, 0)
-  let n1 = AesBlock::load(nonce_bytes, 16)
+  let k0 = AesBlock::load_bytes(key, 0)
+  let k1 = AesBlock::load_bytes(key, 16)
+  let n0 = AesBlock::load_bytes(nonce, 0)
+  let n1 = AesBlock::load_bytes(nonce, 16)
   let k0n0 = k0.xor(n0)
   let k1n1 = k1.xor(n1)
   //
-  let s = FixedArray::make(6, (Default::default() : AesBlock))
-  s[0] = k0n0
-  s[1] = k1n1
-  s[2] = c1
-  s[3] = c0
-  s[4] = k0.xor(c0)
-  s[5] = k1.xor(c1)
+  let s : FixedArray[AesBlock] = [k0n0, k1n1, c1, c0, k0.xor(c0), k1.xor(c1)]
   let self : Aegis256 = { tag_length, state: s, finalized: false, }
   //
   for _ in 0..<4 {
@@ -63,31 +49,35 @@ fn Aegis256::update(self : Aegis256, m : AesBlock) -> Unit {
 }
 
 ///|
-fn Aegis256::absorb(self : Aegis256, ai : FixedArray[Byte]) -> Unit {
-  let t = AesBlock::load(ai, 0)
-  self.update(t)
+fn Aegis256::keystream(self : Aegis256) -> AesBlock {
+  let s = self.state
+  s[1].xor(s[4]).xor(s[5]).xor(s[2].land(s[3]))
 }
 
 ///|
-/// Encrypts the 16-byte block `xi` in place.
-fn Aegis256::enc(self : Aegis256, xi : FixedArray[Byte]) -> Unit {
-  let s = self.state
-  let z = s[1].xor(s[4]).xor(s[5]).xor(s[2].land(s[3]))
-  let t = AesBlock::load(xi, 0)
-  let ci = t.xor(z)
+/// Encrypts the plaintext block `t` into `out[offset:offset + 16]`.
+fn Aegis256::enc(
+  self : Aegis256,
+  t : AesBlock,
+  out : FixedArray[Byte],
+  offset : Int,
+) -> Unit {
+  let z = self.keystream()
   self.update(t)
-  ci.store(xi, 0)
+  t.xor(z).store(out, offset)
 }
 
 ///|
-/// Decrypts the 16-byte block `ci` in place.
-fn Aegis256::dec(self : Aegis256, ci : FixedArray[Byte]) -> Unit {
-  let s = self.state
-  let z = s[1].xor(s[4]).xor(s[5]).xor(s[2].land(s[3]))
-  let t = AesBlock::load(ci, 0)
-  let xi = t.xor(z)
+/// Decrypts the ciphertext block `t` into `out[offset:offset + 16]`.
+fn Aegis256::dec(
+  self : Aegis256,
+  t : AesBlock,
+  out : FixedArray[Byte],
+  offset : Int,
+) -> Unit {
+  let xi = t.xor(self.keystream())
   self.update(xi)
-  xi.store(ci, 0)
+  xi.store(out, offset)
 }
 
 ///|
@@ -99,15 +89,9 @@ fn Aegis256::dec_last(
   pad : FixedArray[Byte],
   cn_length : Int,
 ) -> Unit {
-  let s = self.state
-  let z = s[1].xor(s[4]).xor(s[5]).xor(s[2].land(s[3]))
-  let t = AesBlock::load(pad, 0)
-  t.xor(z).store(pad, 0)
-  for i = cn_length; i < 16; i = i + 1 {
-    pad[i] = b'\x00'
-  }
-  let v = AesBlock::load(pad, 0)
-  self.update(v)
+  AesBlock::load(pad, 0).xor(self.keystream()).store(pad, 0)
+  pad.fill(b'\x00', start=cn_length)
+  self.update(AesBlock::load(pad, 0))
 }
 
 ///|
@@ -119,35 +103,32 @@ fn Aegis256::mac(
   self.finalized = true
   //
   let s = self.state
-  let t = s[3].xor(
-    AesBlock::load(encode_lengths(ad_len_bytes, msg_len_bytes), 0),
-  )
+  let t = s[3].xor(length_block(ad_len_bytes, msg_len_bytes))
   for _ in 0..<7 {
     self.update(t)
   }
+  let tag = FixedArray::make(self.tag_length, b'\x00')
   if self.tag_length == 16 {
-    return s[0].xor(s[1]).xor(s[2]).xor(s[3]).xor(s[4]).xor(s[5]).to_bytes()
+    s[0].xor(s[1]).xor(s[2]).xor(s[3]).xor(s[4]).xor(s[5]).store(tag, 0)
+  } else {
+    s[0].xor(s[1]).xor(s[2]).store(tag, 0)
+    s[3].xor(s[4]).xor(s[5]).store(tag, 16)
   }
-  let tag = FixedArray::make(32, b'\x00')
-  s[0].xor(s[1]).xor(s[2]).store(tag, 0)
-  s[3].xor(s[4]).xor(s[5]).store(tag, 16)
   Bytes::from_array(tag)
 }
 
 ///|
 fn Aegis256::absorb_ad(self : Aegis256, ad : Bytes?) -> Int {
   guard ad is Some(ad) else { return 0 }
-  let buf16 = FixedArray::make(16, b'\x00')
   let mut i = 0
   while i + 16 <= ad.length() {
-    buf16.blit_from_bytes(0, ad, i, 16)
-    self.absorb(buf16)
+    self.update(AesBlock::load_bytes(ad, i))
     i = i + 16
   }
-  if ad.length() % 16 != 0 {
-    buf16.fill(b'\x00')
-    buf16.blit_from_bytes(0, ad, i, ad.length() % 16)
-    self.absorb(buf16)
+  if i < ad.length() {
+    let pad = FixedArray::make(16, b'\x00')
+    pad.blit_from_bytes(0, ad, i, ad.length() - i)
+    self.update(AesBlock::load(pad, 0))
   }
   ad.length()
 }
@@ -164,19 +145,16 @@ pub fn Aegis256::encrypt_detached(
   let msg = msg.unwrap_or(b"")
   let msg_length = msg.length()
   let ciphertext = FixedArray::make(msg_length, b'\x00')
-  let buf16 = FixedArray::make(16, b'\x00')
   let mut i = 0
   while i + 16 <= msg_length {
-    buf16.blit_from_bytes(0, msg, i, 16)
-    self.enc(buf16)
-    buf16.blit_to(ciphertext, len=16, dst_offset=i)
+    self.enc(AesBlock::load_bytes(msg, i), ciphertext, i)
     i = i + 16
   }
-  if msg_length % 16 != 0 {
-    buf16.fill(b'\x00')
-    buf16.blit_from_bytes(0, msg, i, msg_length % 16)
-    self.enc(buf16)
-    buf16.blit_to(ciphertext, len=msg_length % 16, dst_offset=i)
+  if i < msg_length {
+    let pad = FixedArray::make(16, b'\x00')
+    pad.blit_from_bytes(0, msg, i, msg_length - i)
+    self.enc(AesBlock::load(pad, 0), pad, 0)
+    pad.blit_to(ciphertext, len=msg_length - i, dst_offset=i)
   }
   let tag = self.mac(ad_length, msg_length)
   { ciphertext: Bytes::from_array(ciphertext), tag, }
@@ -194,19 +172,16 @@ pub fn Aegis256::decrypt_detached(
   let ciphertext = ac.ciphertext
   let msg_length = ciphertext.length()
   let msg = FixedArray::make(msg_length, b'\x00')
-  let buf16 = FixedArray::make(16, b'\x00')
   let mut i = 0
   while i + 16 <= msg_length {
-    buf16.blit_from_bytes(0, ciphertext, i, 16)
-    self.dec(buf16)
-    buf16.blit_to(msg, len=16, dst_offset=i)
+    self.dec(AesBlock::load_bytes(ciphertext, i), msg, i)
     i = i + 16
   }
-  if msg_length % 16 != 0 {
-    buf16.fill(b'\x00')
-    buf16.blit_from_bytes(0, ciphertext, i, msg_length % 16)
-    self.dec_last(buf16, msg_length % 16)
-    buf16.blit_to(msg, len=msg_length % 16, dst_offset=i)
+  if i < msg_length {
+    let pad = FixedArray::make(16, b'\x00')
+    pad.blit_from_bytes(0, ciphertext, i, msg_length - i)
+    self.dec_last(pad, msg_length - i)
+    pad.blit_to(msg, len=msg_length - i, dst_offset=i)
   }
   let tag = self.mac(ad_length, msg_length)
   if !tags_equal(tag, ac.tag) {

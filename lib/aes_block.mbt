@@ -1,4 +1,5 @@
-let lut0 = [
+///|
+let lut0 : FixedArray[Int] = [
   0xa56363c6, 0x847c7cf8, 0x997777ee, 0x8d7b7bf6, 0x0df2f2ff, 0xbd6b6bd6, 0xb16f6fde,
   0x54c5c591, 0x50303060, 0x03010102, 0xa96767ce, 0x7d2b2b56, 0x19fefee7, 0x62d7d7b5,
   0xe6abab4d, 0x9a7676ec, 0x45caca8f, 0x9d82821f, 0x40c9c989, 0x877d7dfa, 0x15fafaef,
@@ -38,7 +39,8 @@ let lut0 = [
   0xcbb0b07b, 0xfc5454a8, 0xd6bbbb6d, 0x3a16162c,
 ]
 
-let lut1 = [
+///|
+let lut1 : FixedArray[Int] = [
   0x6363c6a5, 0x7c7cf884, 0x7777ee99, 0x7b7bf68d, 0xf2f2ff0d, 0x6b6bd6bd, 0x6f6fdeb1,
   0xc5c59154, 0x30306050, 0x01010203, 0x6767cea9, 0x2b2b567d, 0xfefee719, 0xd7d7b562,
   0xabab4de6, 0x7676ec9a, 0xcaca8f45, 0x82821f9d, 0xc9c98940, 0x7d7dfa87, 0xfafaef15,
@@ -78,7 +80,8 @@ let lut1 = [
   0xb0b07bcb, 0x5454a8fc, 0xbbbb6dd6, 0x16162c3a,
 ]
 
-let lut2 = [
+///|
+let lut2 : FixedArray[Int] = [
   0x63c6a563, 0x7cf8847c, 0x77ee9977, 0x7bf68d7b, 0xf2ff0df2, 0x6bd6bd6b, 0x6fdeb16f,
   0xc59154c5, 0x30605030, 0x01020301, 0x67cea967, 0x2b567d2b, 0xfee719fe, 0xd7b562d7,
   0xab4de6ab, 0x76ec9a76, 0xca8f45ca, 0x821f9d82, 0xc98940c9, 0x7dfa877d, 0xfaef15fa,
@@ -118,7 +121,8 @@ let lut2 = [
   0xb07bcbb0, 0x54a8fc54, 0xbb6dd6bb, 0x162c3a16,
 ]
 
-let lut3 = [
+///|
+let lut3 : FixedArray[Int] = [
   0xc6a56363, 0xf8847c7c, 0xee997777, 0xf68d7b7b, 0xff0df2f2, 0xd6bd6b6b, 0xdeb16f6f,
   0x9154c5c5, 0x60503030, 0x02030101, 0xcea96767, 0x567d2b2b, 0xe719fefe, 0xb562d7d7,
   0x4de6abab, 0xec9a7676, 0x8f45caca, 0x1f9d8282, 0x8940c9c9, 0xfa877d7d, 0xef15fafa,
@@ -158,121 +162,162 @@ let lut3 = [
   0x7bcbb0b0, 0xa8fc5454, 0x6dd6bbbb, 0x2c3a1616,
 ]
 
-pub struct AesBlock {
+///|
+pub(all) struct AesBlock {
   a : Int
   b : Int
   c : Int
   d : Int
-} derive(Show, Default)
+} derive(Debug, Default)
 
+///|
+fn load_le32(bytes : FixedArray[Byte], offset : Int) -> Int {
+  bytes[offset].to_int() |
+  (bytes[offset + 1].to_int() << 8) |
+  (bytes[offset + 2].to_int() << 16) |
+  (bytes[offset + 3].to_int() << 24)
+}
+
+///|
+fn store_le32(bytes : FixedArray[Byte], offset : Int, x : Int) -> Unit {
+  bytes[offset] = x.to_byte()
+  bytes[offset + 1] = (x >> 8).to_byte()
+  bytes[offset + 2] = (x >> 16).to_byte()
+  bytes[offset + 3] = (x >> 24).to_byte()
+}
+
+///|
+/// Loads a block from `bytes[offset:offset + 16]`.
+fn AesBlock::load(bytes : FixedArray[Byte], offset : Int) -> AesBlock {
+  {
+    a: load_le32(bytes, offset + 0 * 4),
+    b: load_le32(bytes, offset + 1 * 4),
+    c: load_le32(bytes, offset + 2 * 4),
+    d: load_le32(bytes, offset + 3 * 4),
+  }
+}
+
+///|
+/// Stores the block into `bytes[offset:offset + 16]`.
+fn AesBlock::store(
+  self : AesBlock,
+  bytes : FixedArray[Byte],
+  offset : Int,
+) -> Unit {
+  store_le32(bytes, offset + 0 * 4, self.a)
+  store_le32(bytes, offset + 1 * 4, self.b)
+  store_le32(bytes, offset + 2 * 4, self.c)
+  store_le32(bytes, offset + 3 * 4, self.d)
+}
+
+///|
 pub fn AesBlock::from_bytes(bytes : Bytes) -> AesBlock {
-  assert_eq?(bytes.length(), 16).unwrap()
+  guard bytes.length() == 16 else {
+    abort("AesBlock::from_bytes: expected 16 bytes")
+  }
+  let a = bytes[0 * 4 + 0].to_int()
+  let a = a | (bytes[0 * 4 + 1].to_int() << 8)
+  let a = a | (bytes[0 * 4 + 2].to_int() << 16)
+  let a = a | (bytes[0 * 4 + 3].to_int() << 24)
   //
-  let a = bytes[0 * 4 + 0].to_int().land(0xff).lsl(0)
-  let a = a.lor(bytes[0 * 4 + 1].to_int().land(0xff).lsl(8))
-  let a = a.lor(bytes[0 * 4 + 2].to_int().land(0xff).lsl(16))
-  let a = a.lor(bytes[0 * 4 + 3].to_int().land(0xff).lsl(24))
+  let b = bytes[1 * 4 + 0].to_int()
+  let b = b | (bytes[1 * 4 + 1].to_int() << 8)
+  let b = b | (bytes[1 * 4 + 2].to_int() << 16)
+  let b = b | (bytes[1 * 4 + 3].to_int() << 24)
   //
-  let b = bytes[1 * 4 + 0].to_int().land(0xff).lsl(0)
-  let b = b.lor(bytes[1 * 4 + 1].to_int().land(0xff).lsl(8))
-  let b = b.lor(bytes[1 * 4 + 2].to_int().land(0xff).lsl(16))
-  let b = b.lor(bytes[1 * 4 + 3].to_int().land(0xff).lsl(24))
+  let c = bytes[2 * 4 + 0].to_int()
+  let c = c | (bytes[2 * 4 + 1].to_int() << 8)
+  let c = c | (bytes[2 * 4 + 2].to_int() << 16)
+  let c = c | (bytes[2 * 4 + 3].to_int() << 24)
   //
-  let c = bytes[2 * 4 + 0].to_int().land(0xff).lsl(0)
-  let c = c.lor(bytes[2 * 4 + 1].to_int().land(0xff).lsl(8))
-  let c = c.lor(bytes[2 * 4 + 2].to_int().land(0xff).lsl(16))
-  let c = c.lor(bytes[2 * 4 + 3].to_int().land(0xff).lsl(24))
+  let d = bytes[3 * 4 + 0].to_int()
+  let d = d | (bytes[3 * 4 + 1].to_int() << 8)
+  let d = d | (bytes[3 * 4 + 2].to_int() << 16)
+  let d = d | (bytes[3 * 4 + 3].to_int() << 24)
   //
-  let d = bytes[3 * 4 + 0].to_int().land(0xff).lsl(0)
-  let d = d.lor(bytes[3 * 4 + 1].to_int().land(0xff).lsl(8))
-  let d = d.lor(bytes[3 * 4 + 2].to_int().land(0xff).lsl(16))
-  let d = d.lor(bytes[3 * 4 + 3].to_int().land(0xff).lsl(24))
-  //
-  { a, b, c, d }
+  { a, b, c, d, }
 }
 
-pub fn to_bytes(self : AesBlock) -> Bytes {
-  let bytes = Bytes::new(16)
-  bytes[0 * 4 + 0] = self.a.lsr(0).to_byte()
-  bytes[0 * 4 + 1] = self.a.lsr(8).to_byte()
-  bytes[0 * 4 + 2] = self.a.lsr(16).to_byte()
-  bytes[0 * 4 + 3] = self.a.lsr(24).to_byte()
-  //
-  bytes[1 * 4 + 0] = self.b.lsr(0).to_byte()
-  bytes[1 * 4 + 1] = self.b.lsr(8).to_byte()
-  bytes[1 * 4 + 2] = self.b.lsr(16).to_byte()
-  bytes[1 * 4 + 3] = self.b.lsr(24).to_byte()
-  //
-  bytes[2 * 4 + 0] = self.c.lsr(0).to_byte()
-  bytes[2 * 4 + 1] = self.c.lsr(8).to_byte()
-  bytes[2 * 4 + 2] = self.c.lsr(16).to_byte()
-  bytes[2 * 4 + 3] = self.c.lsr(24).to_byte()
-  //
-  bytes[3 * 4 + 0] = self.d.lsr(0).to_byte()
-  bytes[3 * 4 + 1] = self.d.lsr(8).to_byte()
-  bytes[3 * 4 + 2] = self.d.lsr(16).to_byte()
-  bytes[3 * 4 + 3] = self.d.lsr(24).to_byte()
-  //
-  bytes
+///|
+pub fn AesBlock::to_bytes(self : AesBlock) -> Bytes {
+  let bytes = FixedArray::make(16, b'\x00')
+  self.store(bytes, 0)
+  Bytes::from_array(bytes)
 }
 
-pub fn clone(self : AesBlock) -> AesBlock { // seems to be passed by value, but arrays are passed by reference
-  { a: self.a, b: self.b, c: self.c, d: self.d }
+///|
+pub fn AesBlock::clone(self : AesBlock) -> AesBlock {
+  { a: self.a, b: self.b, c: self.c, d: self.d, }
 }
 
-pub fn xor(self : AesBlock, other : AesBlock) -> AesBlock {
+///|
+pub fn AesBlock::xor(self : AesBlock, other : AesBlock) -> AesBlock {
   {
-    a: self.a.lxor(other.a),
-    b: self.b.lxor(other.b),
-    c: self.c.lxor(other.c),
-    d: self.d.lxor(other.d),
+    a: self.a ^ other.a,
+    b: self.b ^ other.b,
+    c: self.c ^ other.c,
+    d: self.d ^ other.d,
   }
 }
 
-pub fn and(self : AesBlock, other : AesBlock) -> AesBlock {
+///|
+/// Bitwise AND of two blocks. This used to be called `and`, which is now a
+/// reserved word in MoonBit.
+pub fn AesBlock::land(self : AesBlock, other : AesBlock) -> AesBlock {
   {
-    a: self.a.land(other.a),
-    b: self.b.land(other.b),
-    c: self.c.land(other.c),
-    d: self.d.land(other.d),
+    a: self.a & other.a,
+    b: self.b & other.b,
+    c: self.c & other.c,
+    d: self.d & other.d,
   }
 }
 
-pub fn encrypt(self : AesBlock, round_key : AesBlock) -> AesBlock {
+///|
+pub impl BitXOr for AesBlock with fn lxor(self, other) {
+  self.xor(other)
+}
+
+///|
+pub impl BitAnd for AesBlock with fn land(self, other) {
+  AesBlock::land(self, other)
+}
+
+///|
+/// One AES encryption round (SubBytes, ShiftRows, MixColumns, AddRoundKey).
+pub fn AesBlock::encrypt(self : AesBlock, round_key : AesBlock) -> AesBlock {
   let s0 = self.a
   let s1 = self.b
   let s2 = self.c
   let s3 = self.d
-
   //
-  let x0 = lut0[s0.lsr(0).land(0xff)]
-  let x1 = lut1[s1.lsr(8).land(0xff)]
-  let x2 = lut2[s2.lsr(16).land(0xff)]
-  let x3 = lut3[s3.lsr(24).land(0xff)]
-  let t0 = x0.lxor(x1).lxor(x2).lxor(x3)
+  let x0 = lut0[s0 & 0xff]
+  let x1 = lut1[(s1 >> 8) & 0xff]
+  let x2 = lut2[(s2 >> 16) & 0xff]
+  let x3 = lut3[(s3 >> 24) & 0xff]
+  let t0 = x0 ^ x1 ^ x2 ^ x3
   //
-  let x0 = lut0[s1.lsr(0).land(0xff)]
-  let x1 = lut1[s2.lsr(8).land(0xff)]
-  let x2 = lut2[s3.lsr(16).land(0xff)]
-  let x3 = lut3[s0.lsr(24).land(0xff)]
-  let t1 = x0.lxor(x1).lxor(x2).lxor(x3)
+  let x0 = lut0[s1 & 0xff]
+  let x1 = lut1[(s2 >> 8) & 0xff]
+  let x2 = lut2[(s3 >> 16) & 0xff]
+  let x3 = lut3[(s0 >> 24) & 0xff]
+  let t1 = x0 ^ x1 ^ x2 ^ x3
   //
-  let x0 = lut0[s2.lsr(0).land(0xff)]
-  let x1 = lut1[s3.lsr(8).land(0xff)]
-  let x2 = lut2[s0.lsr(16).land(0xff)]
-  let x3 = lut3[s1.lsr(24).land(0xff)]
-  let t2 = x0.lxor(x1).lxor(x2).lxor(x3)
+  let x0 = lut0[s2 & 0xff]
+  let x1 = lut1[(s3 >> 8) & 0xff]
+  let x2 = lut2[(s0 >> 16) & 0xff]
+  let x3 = lut3[(s1 >> 24) & 0xff]
+  let t2 = x0 ^ x1 ^ x2 ^ x3
   //
-  let x0 = lut0[s3.lsr(0).land(0xff)]
-  let x1 = lut1[s0.lsr(8).land(0xff)]
-  let x2 = lut2[s1.lsr(16).land(0xff)]
-  let x3 = lut3[s2.lsr(24).land(0xff)]
-  let t3 = x0.lxor(x1).lxor(x2).lxor(x3)
+  let x0 = lut0[s3 & 0xff]
+  let x1 = lut1[(s0 >> 8) & 0xff]
+  let x2 = lut2[(s1 >> 16) & 0xff]
+  let x3 = lut3[(s2 >> 24) & 0xff]
+  let t3 = x0 ^ x1 ^ x2 ^ x3
   //
-  let t0 = t0.lxor(round_key.a)
-  let t1 = t1.lxor(round_key.b)
-  let t2 = t2.lxor(round_key.c)
-  let t3 = t3.lxor(round_key.d)
+  let t0 = t0 ^ round_key.a
+  let t1 = t1 ^ round_key.b
+  let t2 = t2 ^ round_key.c
+  let t3 = t3 ^ round_key.d
   //
-  return { a: t0, b: t1, c: t2, d: t3 }
+  { a: t0, b: t1, c: t2, d: t3, }
 }

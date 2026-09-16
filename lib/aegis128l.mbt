@@ -1,65 +1,27 @@
+///|
 pub struct Aegis128L {
-  mut state : Array[AesBlock]
-  mut tag_length : Int
+  state : FixedArray[AesBlock]
+  tag_length : Int
   mut finalized : Bool
-} derive(Show)
+} derive(Debug)
 
+///|
 pub fn Aegis128L::new(
   key : Bytes,
   nonce : Bytes,
-  tag_length : Int
-) -> Aegis128L! {
-  assert_true!(key.length() == 16)
-  assert_true!(nonce.length() == 16)
-  assert_true!(tag_length == 16 || tag_length == 32)
+  tag_length : Int,
+) -> Aegis128L raise {
+  assert_true(key.length() == 16)
+  assert_true(nonce.length() == 16)
+  assert_true(tag_length == 16 || tag_length == 32)
   //
-  let c0_bytes_int = [
-    0x00,
-    0x01,
-    0x01,
-    0x02,
-    0x03,
-    0x05,
-    0x08,
-    0x0d,
-    0x15,
-    0x22,
-    0x37,
-    0x59,
-    0x90 - 256,
-    0xe9 - 256,
-    0x79,
-    0x62,
-  ]
-  let c0_bytes = bytes_array_to_bytes(c0_bytes_int)
-  //
-  let c1_bytes_int = [
-    0xdb - 256,
-    0x3d,
-    0x18,
-    0x55,
-    0x6d,
-    0xc2 - 256,
-    0x2f,
-    0xf1 - 256,
-    0x20,
-    0x11,
-    0x31,
-    0x42,
-    0x73,
-    0xb5 - 256,
-    0x28,
-    0xdd - 256,
-  ]
-  let c1_bytes = bytes_array_to_bytes(c1_bytes_int)
-  //
-  let c0 = AesBlock::from_bytes(c0_bytes)
-  let c1 = AesBlock::from_bytes(c1_bytes)
+  let c0 = AesBlock::load(c0_bytes, 0)
+  let c1 = AesBlock::load(c1_bytes, 0)
   //
   let key_block = AesBlock::from_bytes(key)
   let nonce_block = AesBlock::from_bytes(nonce)
-  //  
-  let s = Array::make(8, AesBlock::default())
+  //
+  let s = FixedArray::make(8, (Default::default() : AesBlock))
   s[0] = key_block.xor(nonce_block)
   s[1] = c1
   s[2] = c0
@@ -68,16 +30,17 @@ pub fn Aegis128L::new(
   s[5] = key_block.xor(c0)
   s[6] = key_block.xor(c1)
   s[7] = key_block.xor(c0)
-  let self : Aegis128L = { tag_length, state: s, finalized: false }
+  let self : Aegis128L = { tag_length, state: s, finalized: false, }
   //
-  for i = 0; i < 10; i = i + 1 {
+  for _ in 0..<10 {
     self.update(nonce_block, key_block)
   }
   //
   self
 }
 
-fn update(self : Aegis128L, m0 : AesBlock, m1 : AesBlock) -> Unit {
+///|
+fn Aegis128L::update(self : Aegis128L, m0 : AesBlock, m1 : AesBlock) -> Unit {
   let s = self.state
   let tmp = s[7]
   s[7] = s[6].encrypt(s[7])
@@ -92,150 +55,82 @@ fn update(self : Aegis128L, m0 : AesBlock, m1 : AesBlock) -> Unit {
   s[0] = s[0].xor(m0)
 }
 
-fn absorb(self : Aegis128L, ai : Bytes) -> Unit {
-  let ai0 = Bytes::new(16)
-  let ai1 = Bytes::new(16)
-  for i = 0; i < 16; i = i + 1 {
-    ai0[i] = ai[i]
-  }
-  for i = 0; i < 16; i = i + 1 {
-    ai1[i] = ai[i + 16]
-  }
-  let t0 = AesBlock::from_bytes(ai0)
-  let t1 = AesBlock::from_bytes(ai1)
+///|
+fn Aegis128L::absorb(self : Aegis128L, ai : FixedArray[Byte]) -> Unit {
+  let t0 = AesBlock::load(ai, 0)
+  let t1 = AesBlock::load(ai, 16)
   self.update(t0, t1)
 }
 
-fn enc(self : Aegis128L, xi : Bytes) -> Bytes {
+///|
+/// Encrypts the 32-byte block `xi` in place.
+fn Aegis128L::enc(self : Aegis128L, xi : FixedArray[Byte]) -> Unit {
   let s = self.state
-  let z0 = s[6].xor(s[1]).xor(s[2].and(s[3]))
-  let z1 = s[2].xor(s[5]).xor(s[6].and(s[7]))
-  let xi0 = Bytes::new(16)
-  let xi1 = Bytes::new(16)
-  //
-  for i = 0; i < 16; i = i + 1 {
-    xi0[i] = xi[i]
-  }
-  for i = 0; i < 16; i = i + 1 {
-    xi1[i] = xi[i + 16]
-  }
-  let t0 = AesBlock::from_bytes(xi0)
-  let t1 = AesBlock::from_bytes(xi1)
-  let out0_bytes = t0.xor(z0).to_bytes()
-  let out1_bytes = t1.xor(z1).to_bytes()
+  let z0 = s[6].xor(s[1]).xor(s[2].land(s[3]))
+  let z1 = s[2].xor(s[5]).xor(s[6].land(s[7]))
+  let t0 = AesBlock::load(xi, 0)
+  let t1 = AesBlock::load(xi, 16)
+  let out0 = t0.xor(z0)
+  let out1 = t1.xor(z1)
   self.update(t0, t1)
-  let ci = Bytes::new(32)
-  for i = 0; i < 16; i = i + 1 {
-    ci[i] = out0_bytes[i]
-  }
-  for i = 0; i < 16; i = i + 1 {
-    ci[i + 16] = out1_bytes[i]
-  }
-  return ci
+  out0.store(xi, 0)
+  out1.store(xi, 16)
 }
 
-fn dec(self : Aegis128L, ci : Bytes) -> Bytes {
+///|
+/// Decrypts the 32-byte block `ci` in place.
+fn Aegis128L::dec(self : Aegis128L, ci : FixedArray[Byte]) -> Unit {
   let s = self.state
-  let z0 = s[6].xor(s[1]).xor(s[2].and(s[3]))
-  let z1 = s[2].xor(s[5]).xor(s[6].and(s[7]))
-  let ci0 = Bytes::new(16)
-  let ci1 = Bytes::new(16)
-  for i = 0; i < 16; i = i + 1 {
-    ci0[i] = ci[i]
-  }
-  for i = 0; i < 16; i = i + 1 {
-    ci1[i] = ci[i + 16]
-  }
-  let t0 = AesBlock::from_bytes(ci0)
-  let t1 = AesBlock::from_bytes(ci1)
+  let z0 = s[6].xor(s[1]).xor(s[2].land(s[3]))
+  let z1 = s[2].xor(s[5]).xor(s[6].land(s[7]))
+  let t0 = AesBlock::load(ci, 0)
+  let t1 = AesBlock::load(ci, 16)
   let out0 = t0.xor(z0)
   let out1 = t1.xor(z1)
   self.update(out0, out1)
-  let out0_bytes = out0.to_bytes()
-  let out1_bytes = out1.to_bytes()
-  let xi = Bytes::new(32)
-  for i = 0; i < 16; i = i + 1 {
-    xi[i] = out0_bytes[i]
-  }
-  for i = 0; i < 16; i = i + 1 {
-    xi[i + 16] = out1_bytes[i]
-  }
-  xi
+  out0.store(ci, 0)
+  out1.store(ci, 16)
 }
 
-fn dec_last(self : Aegis128L, cn : Bytes) -> Bytes {
+///|
+/// Decrypts the final partial block. `pad` holds the `cn_length` ciphertext
+/// bytes followed by zeros; on return, its first `cn_length` bytes hold the
+/// plaintext.
+fn Aegis128L::dec_last(
+  self : Aegis128L,
+  pad : FixedArray[Byte],
+  cn_length : Int,
+) -> Unit {
   let s = self.state
-  let z0 = s[6].xor(s[1]).xor(s[2].and(s[3]))
-  let z1 = s[2].xor(s[5]).xor(s[6].and(s[7]))
-  let pad0 = Bytes::new(16)
-  let pad1 = Bytes::new(16)
-  let cn_length = cn.length()
-  let n = if cn_length >= 16 { 16 } else { cn_length }
-  for i = 0; i < n; i = i + 1 {
-    pad0[i] = cn[i]
+  let z0 = s[6].xor(s[1]).xor(s[2].land(s[3]))
+  let z1 = s[2].xor(s[5]).xor(s[6].land(s[7]))
+  let t0 = AesBlock::load(pad, 0)
+  let t1 = AesBlock::load(pad, 16)
+  let out0 = t0.xor(z0)
+  let out1 = t1.xor(z1)
+  out0.store(pad, 0)
+  out1.store(pad, 16)
+  for i = cn_length; i < 32; i = i + 1 {
+    pad[i] = b'\x00'
   }
-  for i = 16; i < cn_length; i = i + 1 {
-    pad1[i - 16] = cn[i]
-  }
-  let t0 = AesBlock::from_bytes(pad0)
-  let t1 = AesBlock::from_bytes(pad1)
-  let out0_bytes = t0.xor(z0).to_bytes()
-  let out1_bytes = t1.xor(z1).to_bytes()
-  for i = 0; i < 16; i = i + 1 {
-    pad0[i] = out0_bytes[i]
-  }
-  for i = 0; i < 16; i = i + 1 {
-    pad1[i] = out1_bytes[i]
-  }
-  let xn = Bytes::new(cn_length)
-  for i = 0; i < n; i = i + 1 {
-    xn[i] = pad0[i]
-  }
-  for i = 16; i < cn_length; i = i + 1 {
-    xn[i] = pad1[i - 16]
-  }
-  for i = cn_length; i < 16; i = i + 1 {
-    pad0[i] = b'\x00'
-  }
-  if cn_length > 16 {
-    for i = cn_length - 16; i < 16; i = i + 1 {
-      pad1[i] = b'\x00'
-    }
-  }
-  let v0 = AesBlock::from_bytes(pad0)
-  let v1 = AesBlock::from_bytes(pad1)
+  let v0 = AesBlock::load(pad, 0)
+  let v1 = AesBlock::load(pad, 16)
   self.update(v0, v1)
-  xn
 }
 
-fn mac(self : Aegis128L, ad_len_bytes : Int, msg_len_bytes : Int) -> Bytes {
+///|
+fn Aegis128L::mac(
+  self : Aegis128L,
+  ad_len_bytes : Int,
+  msg_len_bytes : Int,
+) -> Bytes {
   self.finalized = true
   //
   let s = self.state
-  let bytes = Bytes::new(16)
-  //
-  let ad_len = @int64.from_int(ad_len_bytes) * 8L
-  let msg_len = @int64.from_int(msg_len_bytes) * 8L
-  //
-  bytes[0 * 8 + 0] = ad_len.lsr(0).to_byte()
-  bytes[0 * 8 + 1] = ad_len.lsr(8).to_byte()
-  bytes[0 * 8 + 2] = ad_len.lsr(16).to_byte()
-  bytes[0 * 8 + 3] = ad_len.lsr(24).to_byte()
-  bytes[0 * 8 + 4] = ad_len.lsr(32).to_byte()
-  bytes[0 * 8 + 5] = ad_len.lsr(40).to_byte()
-  bytes[0 * 8 + 6] = ad_len.lsr(48).to_byte()
-  bytes[0 * 8 + 7] = ad_len.lsr(56).to_byte()
-  bytes[1 * 8 + 0] = msg_len.lsr(0).to_byte()
-  bytes[1 * 8 + 1] = msg_len.lsr(8).to_byte()
-  bytes[1 * 8 + 2] = msg_len.lsr(16).to_byte()
-  bytes[1 * 8 + 3] = msg_len.lsr(24).to_byte()
-  bytes[1 * 8 + 4] = msg_len.lsr(32).to_byte()
-  bytes[1 * 8 + 5] = msg_len.lsr(40).to_byte()
-  bytes[1 * 8 + 6] = msg_len.lsr(48).to_byte()
-  bytes[1 * 8 + 7] = msg_len.lsr(56).to_byte()
-  //
-  let t = s[2].xor(AesBlock::from_bytes(bytes))
-  for i = 0; i < 7; i = i + 1 {
+  let t = s[2].xor(
+    AesBlock::load(encode_lengths(ad_len_bytes, msg_len_bytes), 0),
+  )
+  for _ in 0..<7 {
     self.update(t, t)
   }
   if self.tag_length == 16 {
@@ -248,142 +143,90 @@ fn mac(self : Aegis128L, ad_len_bytes : Int, msg_len_bytes : Int) -> Bytes {
       .xor(s[6])
       .to_bytes()
   }
-  let tag = Bytes::new(32)
-  let t0 = s[0].xor(s[1]).xor(s[2]).xor(s[3]).to_bytes()
-  let t1 = s[4].xor(s[5]).xor(s[6]).xor(s[7]).to_bytes()
-  for i = 0; i < 16; i = i + 1 {
-    tag[i] = t0[i]
-  }
-  for i = 0; i < 16; i = i + 1 {
-    tag[16 + i] = t1[i]
-  }
-  tag
+  let tag = FixedArray::make(32, b'\x00')
+  s[0].xor(s[1]).xor(s[2]).xor(s[3]).store(tag, 0)
+  s[4].xor(s[5]).xor(s[6]).xor(s[7]).store(tag, 16)
+  Bytes::from_array(tag)
 }
 
-pub fn encrypt_detached(
-  self : Aegis128L,
-  msg : Bytes?,
-  ad : Bytes?
-) -> AuthenticatedCiphertext!Error {
-  assert_true!(self.finalized.not())
-  //  
-  let buf32 = Bytes::new(32)
+///|
+fn Aegis128L::absorb_ad(self : Aegis128L, ad : Bytes?) -> Int {
+  guard ad is Some(ad) else { return 0 }
+  let buf32 = FixedArray::make(32, b'\x00')
   let mut i = 0
-  if ad.is_empty().not() {
-    let ad = ad.unwrap()
-    while i + 32 <= ad.length() {
-      for j = 0; j < 32; j = j + 1 {
-        buf32[j] = ad[i + j]
-      }
-      self.absorb(buf32)
-      i = i + 32
-    }
-    if ad.length() % 32 != 0 {
-      let pad = buf32
-      for j = 0; j < pad.length(); j = j + 1 {
-        pad[j] = b'\x00'
-      }
-      for j = 0; j < ad.length() % 32; j = j + 1 {
-        pad[j] = ad[i + j]
-      }
-      self.absorb(pad)
-    }
-  }
-  let ciphertext_length = if msg.is_empty() { 0 } else { msg.unwrap().length() }
-  let ciphertext = Bytes::new(ciphertext_length)
-  if msg.is_empty().not() {
-    let msg = msg.unwrap()
-    let mut i = 0
-    while i + 32 <= msg.length() {
-      for j = 0; j < 32; j = j + 1 {
-        buf32[j] = msg[i + j]
-      }
-      let ci = self.enc(buf32)
-      for j = 0; j < 32; j = j + 1 {
-        ciphertext[i + j] = ci[j]
-      }
-      i = i + 32
-    }
-    if msg.length() % 32 != 0 {
-      let pad = buf32
-      for j = 0; j < pad.length(); j = j + 1 {
-        pad[j] = b'\x00'
-      }
-      for j = 0; j < msg.length() % 32; j = j + 1 {
-        pad[j] = msg[i + j]
-      }
-      let ci = self.enc(pad)
-      for j = 0; j < msg.length() % 32; j = j + 1 {
-        ciphertext[i + j] = ci[j]
-      }
-    }
-  }
-  let ad_length = if ad.is_empty() { 0 } else { ad.unwrap().length() }
-  let msg_length = if msg.is_empty() { 0 } else { msg.unwrap().length() }
-  let tag = self.mac(ad_length, msg_length)
-  { ciphertext, tag }
-}
-
-pub fn decrypt_detached(
-  self : Aegis128L,
-  ac : AuthenticatedCiphertext,
-  ad : Bytes?
-) -> Bytes! {
-  assert_true!(self.finalized.not())
-  //  
-  let buf32 = Bytes::new(32)
-  let mut i = 0
-  if ad.is_empty().not() {
-    let ad = ad.unwrap()
-    while i + 32 <= ad.length() {
-      for j = 0; j < 32; j = j + 1 {
-        buf32[j] = ad[i + j]
-      }
-      self.absorb(buf32)
-      i = i + 32
-    }
-    if ad.length() % 32 != 0 {
-      let pad = buf32
-      for j = 0; j < pad.length(); j = j + 1 {
-        pad[j] = b'\x00'
-      }
-      for j = 0; j < ad.length() % 32; j = j + 1 {
-        pad[j] = ad[i + j]
-      }
-      self.absorb(pad)
-    }
-  }
-  let msg_length = ac.ciphertext.length()
-  let msg = Bytes::new(msg_length)
-  let mut i = 0
-  while i + 32 <= ac.ciphertext.length() {
-    for j = 0; j < 32; j = j + 1 {
-      buf32[j] = ac.ciphertext[i + j]
-    }
-    let xi = self.dec(buf32)
-    for j = 0; j < 32; j = j + 1 {
-      msg[i + j] = xi[j]
-    }
+  while i + 32 <= ad.length() {
+    buf32.blit_from_bytes(0, ad, i, 32)
+    self.absorb(buf32)
     i = i + 32
   }
-  if ac.ciphertext.length() % 32 != 0 {
-    let remaining = Bytes::new(ac.ciphertext.length() % 32)
-    for j = 0; j < remaining.length(); j = j + 1 {
-      remaining[j] = ac.ciphertext[i + j]
-    }
-    let xi = self.dec_last(remaining)
-    for j = 0; j < remaining.length(); j = j + 1 {
-      msg[i + j] = xi[j]
-    }
+  if ad.length() % 32 != 0 {
+    buf32.fill(b'\x00')
+    buf32.blit_from_bytes(0, ad, i, ad.length() % 32)
+    self.absorb(buf32)
   }
-  let ad_length = if ad.is_empty() { 0 } else { ad.unwrap().length() }
+  ad.length()
+}
+
+///|
+pub fn Aegis128L::encrypt_detached(
+  self : Aegis128L,
+  msg : Bytes?,
+  ad : Bytes?,
+) -> AuthenticatedCiphertext raise {
+  assert_true(!self.finalized)
+  //
+  let ad_length = self.absorb_ad(ad)
+  let msg = msg.unwrap_or(b"")
+  let msg_length = msg.length()
+  let ciphertext = FixedArray::make(msg_length, b'\x00')
+  let buf32 = FixedArray::make(32, b'\x00')
+  let mut i = 0
+  while i + 32 <= msg_length {
+    buf32.blit_from_bytes(0, msg, i, 32)
+    self.enc(buf32)
+    buf32.blit_to(ciphertext, len=32, dst_offset=i)
+    i = i + 32
+  }
+  if msg_length % 32 != 0 {
+    buf32.fill(b'\x00')
+    buf32.blit_from_bytes(0, msg, i, msg_length % 32)
+    self.enc(buf32)
+    buf32.blit_to(ciphertext, len=msg_length % 32, dst_offset=i)
+  }
   let tag = self.mac(ad_length, msg_length)
-  let mut dt = b'\x00'
-  for i = 0; i < tag.length(); i = i + 1 {
-    dt = dt.to_int().lor(tag[i].to_int().lxor(ac.tag[i].to_int())).to_byte()
+  { ciphertext: Bytes::from_array(ciphertext), tag, }
+}
+
+///|
+pub fn Aegis128L::decrypt_detached(
+  self : Aegis128L,
+  ac : AuthenticatedCiphertext,
+  ad : Bytes?,
+) -> Bytes raise {
+  assert_true(!self.finalized)
+  //
+  let ad_length = self.absorb_ad(ad)
+  let ciphertext = ac.ciphertext
+  let msg_length = ciphertext.length()
+  let msg = FixedArray::make(msg_length, b'\x00')
+  let buf32 = FixedArray::make(32, b'\x00')
+  let mut i = 0
+  while i + 32 <= msg_length {
+    buf32.blit_from_bytes(0, ciphertext, i, 32)
+    self.dec(buf32)
+    buf32.blit_to(msg, len=32, dst_offset=i)
+    i = i + 32
   }
-  if dt != b'\x00' {
-    fail!("Verification failed")
+  if msg_length % 32 != 0 {
+    buf32.fill(b'\x00')
+    buf32.blit_from_bytes(0, ciphertext, i, msg_length % 32)
+    self.dec_last(buf32, msg_length % 32)
+    buf32.blit_to(msg, len=msg_length % 32, dst_offset=i)
   }
-  msg
+  let tag = self.mac(ad_length, msg_length)
+  if !tags_equal(tag, ac.tag) {
+    msg.fill(b'\x00')
+    fail("Verification failed")
+  }
+  Bytes::from_array(msg)
 }

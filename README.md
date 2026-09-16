@@ -2,7 +2,9 @@
 
 An implementation of the AEGIS authenticated encryption algorithms (AEGIS-128L and AEGIS-256) in the Moonbit language.
 
-Both ciphers follow the [AEGIS specification](https://datatracker.ietf.org/doc/draft-irtf-cfrg-aegis-aead/) and are checked against its test vectors. Tags can be 16 or 32 bytes long.
+Both ciphers follow the [AEGIS specification](https://datatracker.ietf.org/doc/draft-irtf-cfrg-aegis-aead/) and are checked against its test vectors.
+
+Tags can be 16 or 32 bytes long.
 
 ## Usage
 

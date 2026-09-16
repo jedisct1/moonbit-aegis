@@ -1,3 +1,11 @@
 import {
   "moonbitlang/core/encoding/hex",
+  "moonbitlang/core/bench",
 } for "test"
+
+options(
+  targets: {
+    "words.mbt": [ "native", "llvm", "wasm", "wasm-gc" ],
+    "words_js.mbt": [ "js" ],
+  },
+)

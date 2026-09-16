@@ -1,5 +1,5 @@
 ///|
-let lut0 : FixedArray[Int] = [
+let lut0 : FixedArray[Int] = words_from([
   0xa56363c6, 0x847c7cf8, 0x997777ee, 0x8d7b7bf6, 0x0df2f2ff, 0xbd6b6bd6, 0xb16f6fde,
   0x54c5c591, 0x50303060, 0x03010102, 0xa96767ce, 0x7d2b2b56, 0x19fefee7, 0x62d7d7b5,
   0xe6abab4d, 0x9a7676ec, 0x45caca8f, 0x9d82821f, 0x40c9c989, 0x877d7dfa, 0x15fafaef,
@@ -37,10 +37,10 @@ let lut0 : FixedArray[Int] = [
   0x78282850, 0x7adfdfa5, 0x8f8c8c03, 0xf8a1a159, 0x80898909, 0x170d0d1a, 0xdabfbf65,
   0x31e6e6d7, 0xc6424284, 0xb86868d0, 0xc3414182, 0xb0999929, 0x772d2d5a, 0x110f0f1e,
   0xcbb0b07b, 0xfc5454a8, 0xd6bbbb6d, 0x3a16162c,
-]
+])
 
 ///|
-let lut1 : FixedArray[Int] = [
+let lut1 : FixedArray[Int] = words_from([
   0x6363c6a5, 0x7c7cf884, 0x7777ee99, 0x7b7bf68d, 0xf2f2ff0d, 0x6b6bd6bd, 0x6f6fdeb1,
   0xc5c59154, 0x30306050, 0x01010203, 0x6767cea9, 0x2b2b567d, 0xfefee719, 0xd7d7b562,
   0xabab4de6, 0x7676ec9a, 0xcaca8f45, 0x82821f9d, 0xc9c98940, 0x7d7dfa87, 0xfafaef15,
@@ -78,10 +78,10 @@ let lut1 : FixedArray[Int] = [
   0x28285078, 0xdfdfa57a, 0x8c8c038f, 0xa1a159f8, 0x89890980, 0x0d0d1a17, 0xbfbf65da,
   0xe6e6d731, 0x424284c6, 0x6868d0b8, 0x414182c3, 0x999929b0, 0x2d2d5a77, 0x0f0f1e11,
   0xb0b07bcb, 0x5454a8fc, 0xbbbb6dd6, 0x16162c3a,
-]
+])
 
 ///|
-let lut2 : FixedArray[Int] = [
+let lut2 : FixedArray[Int] = words_from([
   0x63c6a563, 0x7cf8847c, 0x77ee9977, 0x7bf68d7b, 0xf2ff0df2, 0x6bd6bd6b, 0x6fdeb16f,
   0xc59154c5, 0x30605030, 0x01020301, 0x67cea967, 0x2b567d2b, 0xfee719fe, 0xd7b562d7,
   0xab4de6ab, 0x76ec9a76, 0xca8f45ca, 0x821f9d82, 0xc98940c9, 0x7dfa877d, 0xfaef15fa,
@@ -119,10 +119,10 @@ let lut2 : FixedArray[Int] = [
   0x28507828, 0xdfa57adf, 0x8c038f8c, 0xa159f8a1, 0x89098089, 0x0d1a170d, 0xbf65dabf,
   0xe6d731e6, 0x4284c642, 0x68d0b868, 0x4182c341, 0x9929b099, 0x2d5a772d, 0x0f1e110f,
   0xb07bcbb0, 0x54a8fc54, 0xbb6dd6bb, 0x162c3a16,
-]
+])
 
 ///|
-let lut3 : FixedArray[Int] = [
+let lut3 : FixedArray[Int] = words_from([
   0xc6a56363, 0xf8847c7c, 0xee997777, 0xf68d7b7b, 0xff0df2f2, 0xd6bd6b6b, 0xdeb16f6f,
   0x9154c5c5, 0x60503030, 0x02030101, 0xcea96767, 0x567d2b2b, 0xe719fefe, 0xb562d7d7,
   0x4de6abab, 0xec9a7676, 0x8f45caca, 0x1f9d8282, 0x8940c9c9, 0xfa877d7d, 0xef15fafa,
@@ -160,7 +160,25 @@ let lut3 : FixedArray[Int] = [
   0x50782828, 0xa57adfdf, 0x038f8c8c, 0x59f8a1a1, 0x09808989, 0x1a170d0d, 0x65dabfbf,
   0xd731e6e6, 0x84c64242, 0xd0b86868, 0x82c34141, 0x29b09999, 0x5a772d2d, 0x1e110f0f,
   0x7bcbb0b0, 0xa8fc5454, 0x6dd6bbbb, 0x2c3a1616,
-]
+])
+
+///|
+#inline
+fn lut_get(lut : FixedArray[Int], x : Int) -> Int {
+  // The mask keeps the index inside the table
+  lut.unsafe_get(x & 0xff)
+}
+
+///|
+/// Works out one word of an AES round from four input words, leaving out the round key.
+/// Each output word takes the same four inputs, starting from a different one.
+#inline
+fn mix(w0 : Int, w1 : Int, w2 : Int, w3 : Int) -> Int {
+  lut_get(lut0, w0) ^
+  lut_get(lut1, w1 >> 8) ^
+  lut_get(lut2, w2 >> 16) ^
+  lut_get(lut3, w3 >> 24)
+}
 
 ///|
 #valtype
@@ -172,75 +190,26 @@ pub(all) struct AesBlock {
 } derive(Debug, Default)
 
 ///|
-fn load_le32(bytes : FixedArray[Byte], offset : Int) -> Int {
-  bytes[offset].to_int() |
-  (bytes[offset + 1].to_int() << 8) |
-  (bytes[offset + 2].to_int() << 16) |
-  (bytes[offset + 3].to_int() << 24)
-}
-
-///|
-fn store_le32(bytes : FixedArray[Byte], offset : Int, x : Int) -> Unit {
-  bytes[offset] = x.to_byte()
-  bytes[offset + 1] = (x >> 8).to_byte()
-  bytes[offset + 2] = (x >> 16).to_byte()
-  bytes[offset + 3] = (x >> 24).to_byte()
-}
-
-///|
-/// Loads a block from `bytes[offset:offset + 16]`.
-fn AesBlock::load(bytes : FixedArray[Byte], offset : Int) -> AesBlock {
-  {
-    a: load_le32(bytes, offset),
-    b: load_le32(bytes, offset + 4),
-    c: load_le32(bytes, offset + 8),
-    d: load_le32(bytes, offset + 12),
-  }
-}
-
-///|
-/// Loads a block from `bytes[offset:offset + 16]`.
-fn AesBlock::load_bytes(bytes : Bytes, offset : Int) -> AesBlock {
-  AesBlock::from_view(bytes[offset:offset + 16])
-}
-
-///|
-fn AesBlock::from_view(bytes : BytesView) -> AesBlock {
-  match bytes {
-    [u32le(a), u32le(b), u32le(c), u32le(d)] =>
-      {
-        a: a.reinterpret_as_int(),
-        b: b.reinterpret_as_int(),
-        c: c.reinterpret_as_int(),
-        d: d.reinterpret_as_int(),
-      }
-    _ => abort("AesBlock::from_bytes: expected 16 bytes")
-  }
-}
-
-///|
-/// Stores the block into `bytes[offset:offset + 16]`.
-fn AesBlock::store(
-  self : AesBlock,
-  bytes : FixedArray[Byte],
-  offset : Int,
-) -> Unit {
-  store_le32(bytes, offset, self.a)
-  store_le32(bytes, offset + 4, self.b)
-  store_le32(bytes, offset + 8, self.c)
-  store_le32(bytes, offset + 12, self.d)
-}
-
-///|
 pub fn AesBlock::from_bytes(bytes : Bytes) -> AesBlock {
-  AesBlock::from_view(bytes[:])
+  guard bytes.length() == 16 else {
+    abort("AesBlock::from_bytes: expected 16 bytes")
+  }
+  {
+    a: load_le32_bytes(bytes, 0),
+    b: load_le32_bytes(bytes, 4),
+    c: load_le32_bytes(bytes, 8),
+    d: load_le32_bytes(bytes, 12),
+  }
 }
 
 ///|
 pub fn AesBlock::to_bytes(self : AesBlock) -> Bytes {
   let bytes = FixedArray::make(16, b'\x00')
-  self.store(bytes, 0)
-  Bytes::from_array(bytes)
+  store_le32(bytes, 0, self.a)
+  store_le32(bytes, 4, self.b)
+  store_le32(bytes, 8, self.c)
+  store_le32(bytes, 12, self.d)
+  freeze(bytes)
 }
 
 ///|
@@ -259,8 +228,8 @@ pub fn AesBlock::xor(self : AesBlock, other : AesBlock) -> AesBlock {
 }
 
 ///|
-/// Bitwise AND of two blocks. This used to be called `and`, which is now a
-/// reserved word in MoonBit.
+/// Bitwise AND of two blocks.
+/// It isn't called `and` because MoonBit reserves that word.
 pub fn AesBlock::land(self : AesBlock, other : AesBlock) -> AesBlock {
   {
     a: self.a & other.a,
@@ -271,41 +240,16 @@ pub fn AesBlock::land(self : AesBlock, other : AesBlock) -> AesBlock {
 }
 
 ///|
-/// One AES encryption round (SubBytes, ShiftRows, MixColumns, AddRoundKey).
+/// Runs one AES encryption round with the given round key.
 pub fn AesBlock::encrypt(self : AesBlock, round_key : AesBlock) -> AesBlock {
   let s0 = self.a
   let s1 = self.b
   let s2 = self.c
   let s3 = self.d
-  //
-  let x0 = lut0[s0 & 0xff]
-  let x1 = lut1[(s1 >> 8) & 0xff]
-  let x2 = lut2[(s2 >> 16) & 0xff]
-  let x3 = lut3[(s3 >> 24) & 0xff]
-  let t0 = x0 ^ x1 ^ x2 ^ x3
-  //
-  let x0 = lut0[s1 & 0xff]
-  let x1 = lut1[(s2 >> 8) & 0xff]
-  let x2 = lut2[(s3 >> 16) & 0xff]
-  let x3 = lut3[(s0 >> 24) & 0xff]
-  let t1 = x0 ^ x1 ^ x2 ^ x3
-  //
-  let x0 = lut0[s2 & 0xff]
-  let x1 = lut1[(s3 >> 8) & 0xff]
-  let x2 = lut2[(s0 >> 16) & 0xff]
-  let x3 = lut3[(s1 >> 24) & 0xff]
-  let t2 = x0 ^ x1 ^ x2 ^ x3
-  //
-  let x0 = lut0[s3 & 0xff]
-  let x1 = lut1[(s0 >> 8) & 0xff]
-  let x2 = lut2[(s1 >> 16) & 0xff]
-  let x3 = lut3[(s2 >> 24) & 0xff]
-  let t3 = x0 ^ x1 ^ x2 ^ x3
-  //
-  let t0 = t0 ^ round_key.a
-  let t1 = t1 ^ round_key.b
-  let t2 = t2 ^ round_key.c
-  let t3 = t3 ^ round_key.d
-  //
-  { a: t0, b: t1, c: t2, d: t3, }
+  {
+    a: mix(s0, s1, s2, s3) ^ round_key.a,
+    b: mix(s1, s2, s3, s0) ^ round_key.b,
+    c: mix(s2, s3, s0, s1) ^ round_key.c,
+    d: mix(s3, s0, s1, s2) ^ round_key.d,
+  }
 }

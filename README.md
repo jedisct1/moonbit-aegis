@@ -21,3 +21,12 @@ let decrypted = @lib.Aegis128L::new(key, nonce, 32).decrypt_detached(ac, Some(ad
 ```
 
 A state object can only be used for one operation. `decrypt_detached` raises an error if the tag doesn't verify, and no plaintext is returned in that case.
+
+## Tests and benchmarks
+
+```sh
+moon test --target all
+moon bench --release --target native   # or js, wasm-gc
+```
+
+The benchmarks encrypt and decrypt 16 KB messages, and measure a full encryption of a short associated data string with no message.
